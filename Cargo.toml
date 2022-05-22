@@ -1,0 +1,15 @@
+[package]
+name = "lse"
+version = "0.1.0"
+edition = "2021"
+license = "ISC"
+authors = ["bilaliscarioth"]
+
+
+[lib]
+name = "lse"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sdl2 = "0.35.2"
