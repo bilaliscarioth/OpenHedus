@@ -1,43 +1,216 @@
-extern crate sdl2;
+extern crate x11;
+extern crate gl;
 
-use sdl2::event::{Event, EventType};
-use sdl2::event::Event::Quit;
-use sdl2::{Sdl, VideoSubsystem, EventPump};
-use sdl2::video::Window;
 
-struct LseWindow {
-    sdl_window : Window,
-    sdl_context : Sdl,
-    sdl_video_subsystem : VideoSubsystem,
-    sdl_event : EventPump
+use x11::xlib::{Display, Window, Screen, XEvent, XDefaultScreenOfDisplay, XCloseDisplay,
+                XWindowAttributes, XOpenDisplay, XDefaultScreen, XVisualInfo, XFree,
+                XSetWindowAttributes, XBlackPixel, XWhitePixel, True, False,
+                XCreateColormap, AllocNone, XRootWindow, ExposureMask, KeyPressMask,
+                KeyReleaseMask, XCreateWindow, InputOutput, CWBackPixel, CWColormap, 
+                CWBorderPixel, CWEventMask, XStoreName, XSync, XMapRaised, XClearWindow, 
+                XMapWindow};
+
+use x11::glx::{GLXContext, GLXFBConfig, glXQueryVersion, glXGetVisualFromFBConfig,
+                GLX_RGBA, GLX_DEPTH_SIZE, GLX_DOUBLEBUFFER, GLX_NONE, glXChooseFBConfig,
+                glXGetFBConfigAttrib, GLX_SAMPLE_BUFFERS, GLX_SAMPLES, glXGetProcAddressARB,
+                glXQueryExtensionsString,  glXCreateNewContext, glXMakeCurrent,
+                GLX_RGBA_TYPE};
+
+use x11::glx::arb::{GLX_CONTEXT_MAJOR_VERSION_ARB, GLX_CONTEXT_MINOR_VERSION_ARB,
+                    GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB};
+
+use gl::types::{GLint};
+
+use std::ffi::c_void;
+use std::ptr;
+use std::mem::transmute;
+use std::ffi::CStr;
+
+
+type GlXcreateContextAttribsArbproc = fn(*mut Display, GLXFBConfig, GLXContext, bool, *mut u32) -> *mut GLXContext;
+
+pub struct LseWindow{
+    display :   *mut Display,
+    window  :   Window,
+    screen  :   *mut Screen,
+    screenId:   i32,
+    xev     :   *mut XEvent,
+    attribs :   *mut XWindowAttributes,
+    GlXcreateContextAttribsArb : GlXcreateContextAttribsArbproc,
+    context :   *mut GLXContext
 }
 
 impl LseWindow{
-    pub fn new(_title: &str, _width: u16, _height: u16) -> LseWindow {
-        //Sdl2 Init
-        let tmp_sdl_context : Sdl = sdl2::init().unwrap();
-        //Video subsys
-        let tmp_video_subsys : VideoSubsystem = tmp_sdl_context
-            .video()
-            .unwrap();
-        //
-        let tmp_sdl_event : EventPump = tmp_sdl_context.event_pump()
-            .unwrap();
-        //Building window
-        let tmp_window : Window = tmp_video_subsys.window(_title, _width.into(), _height.into())
-            .position_centered()
-            .build()
-            .unwrap();
+    pub fn new(_title: &str, _width: u16, _height: u16) -> Result<LseWindow, throw::Error<&'static str>> {
 
-         LseWindow{
-            sdl_context: tmp_sdl_context, 
-            sdl_video_subsystem: tmp_video_subsys,
-            sdl_window: tmp_window,
-            sdl_event: tmp_sdl_event
+        let mut tmpSelf : LseWindow = LseWindow{ 
+            display:    std::ptr::null_mut() as *mut Display,
+            window:     0,
+            screen:     std::ptr::null_mut() as *mut Screen,
+            screenId :  0,
+            xev:        std::ptr::null_mut() as *mut XEvent,
+            attribs :   std::ptr::null_mut() as *mut XWindowAttributes,
+            GlXcreateContextAttribsArb:  unsafe { 
+                let pointer = glXGetProcAddressARB("glXCreateContextAttribsARB".as_ptr());
+                transmute::<Option<unsafe extern "C" fn()>, GlXcreateContextAttribsArbproc >(pointer)
+            },
+            context :   std::ptr::null_mut() as *mut GLXContext
+        };
+        
+        tmpSelf.display = unsafe { XOpenDisplay(ptr::null()) };
+
+        if tmpSelf.display.is_null() {
+            throw_new!("Impossible to open display"); 
         }
+
+
+        tmpSelf.screen = unsafe { XDefaultScreenOfDisplay(tmpSelf.display) };
+        tmpSelf.screenId = unsafe { XDefaultScreen(tmpSelf.display) };
+
+        let mut majorGLX : GLint = 0;
+        let mut minorGLX : GLint = 0;
+
+        unsafe { 
+            glXQueryVersion(tmpSelf.display, &mut majorGLX, &mut minorGLX);
+        };
+
+        if majorGLX <= 1 && minorGLX < 2 {
+            throw_new!("Old GLX version not supported");
+        }
+        
+        let glxAttribs : [GLint; 5] = [GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, GLX_NONE];
+        let mut fbcount : i32 = 0;
+
+        let fbc: *mut GLXFBConfig = unsafe { glXChooseFBConfig(tmpSelf.display, tmpSelf.screenId, glxAttribs.as_ptr(), &mut fbcount) };
+
+        if fbc.is_null(){
+            unsafe { XCloseDisplay(tmpSelf.display); };
+            throw_new!("Not found a good FBconfig");
+        }
+
+
+        let mut best_fbc : i32 = -1;
+        let mut worst_fbc : i32 = -1;
+        let mut best_num_samp : i32 = -1;
+        let mut worst_num_samp : i32 = 999;
+        
+        for i in 0..fbcount  {
+            let vi : *mut XVisualInfo = unsafe  { glXGetVisualFromFBConfig(tmpSelf.display,
+                *fbc.offset(i.try_into().unwrap())) };
+            if !vi.is_null() {
+                let mut samp_buf : i32 = 0;
+                let mut samples : i32 = 0;
+                unsafe {
+                    glXGetFBConfigAttrib( tmpSelf.display, *fbc.offset(i.try_into().unwrap()) , 
+                        GLX_SAMPLE_BUFFERS, &mut samp_buf);
+                    glXGetFBConfigAttrib( tmpSelf.display, *fbc.offset(i.try_into().unwrap()) ,  
+                        GLX_SAMPLES, &mut samples);
+                };
+
+
+                if best_fbc < 0 ||  (samp_buf > 0 && samples > best_num_samp) {
+                    best_fbc = i;
+                    best_num_samp = samples;
+                } 
+
+                if worst_fbc < 0 || !samp_buf > 0 || samples < worst_num_samp {
+                    worst_fbc = i;
+                } 
+                worst_num_samp = samples;
+            }
+
+            unsafe {
+                XFree(vi as *mut c_void);
+            };
+        }
+
+        let bestFbc : GLXFBConfig = unsafe { * fbc.offset(best_fbc.try_into().unwrap()) };
+
+        unsafe { XFree( fbc as *mut c_void ); };
+
+        let visual : *mut XVisualInfo = unsafe { glXGetVisualFromFBConfig(tmpSelf.display, bestFbc) };
+
+        if visual.is_null() {
+            unsafe { XCloseDisplay(tmpSelf.display) };
+            throw_new!("Can't create correct visual window");
+        }
+
+        if tmpSelf.screenId  != unsafe { (*visual).screen } {
+            unsafe { XCloseDisplay(tmpSelf.display); };
+            throw_new!("Visual doesn't match with tmpScreenId");
+        }
+
+        let mut windowAttribs : XSetWindowAttributes = XSetWindowAttributes {
+            border_pixel : unsafe { XBlackPixel(tmpSelf.display, tmpSelf.screenId) },
+            background_pixel : unsafe { XWhitePixel(tmpSelf.display, tmpSelf.screenId) },
+            override_redirect : True,
+            colormap : unsafe {XCreateColormap(tmpSelf.display, XRootWindow(tmpSelf.display, tmpSelf.screenId), (*visual).visual, AllocNone)},
+            event_mask : ExposureMask | KeyPressMask | KeyReleaseMask,
+            background_pixmap: 0,
+            bit_gravity: 0,
+            win_gravity: 0,
+            save_under: 0,
+            do_not_propagate_mask: 0,
+            cursor: 0,
+            backing_pixel:  0,
+            backing_planes: 0,
+            backing_store: 0,
+            border_pixmap: 0
+        };
+
+        tmpSelf.window = unsafe {XCreateWindow(tmpSelf.display, XRootWindow(tmpSelf.display, tmpSelf.screenId), 0, 0, _width.into()
+            , _height.into() , 0, (*visual).depth, InputOutput.try_into().unwrap(), (*visual).visual, 
+            CWBackPixel | CWColormap | CWBorderPixel | CWEventMask, &mut windowAttribs) };
+
+        unsafe {
+            XMapWindow(tmpSelf.display, tmpSelf.window);
+        };
+
+
+
+        let contextAttribs : [i32; 7]  =  [ 
+            GLX_CONTEXT_MAJOR_VERSION_ARB, 3, 
+            GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+            GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+            GLX_NONE
+        ];
+
+        let glxExts : &str = unsafe {
+            CStr::from_ptr(glXQueryExtensionsString(tmpSelf.display, tmpSelf.screenId)).to_str().unwrap()
+        };
+
+        tmpSelf.context = unsafe { &mut glXCreateNewContext( tmpSelf.display, bestFbc, GLX_RGBA_TYPE, ptr::null_mut() as GLXContext, True ) };
+
+        unsafe {
+            XSync( tmpSelf.display, 0);
+            glXMakeCurrent(tmpSelf.display, tmpSelf.window, *tmpSelf.context);
+            // Show the window
+            XClearWindow(tmpSelf.display, tmpSelf.window);
+            XMapRaised(tmpSelf.display, tmpSelf.window);
+        };
+
+        Ok(tmpSelf)
     }
 
-    pub fn is_running(&self) -> bool {
+    pub fn refresh(&self) {
+        unsafe {
+            gl::Viewport(0, 0, 800, 600);
+        };
+    }
+
+    pub fn is_fullscreen(&self){
+    
+    }
+
+    pub fn swap_buffer(&self){
 
     }
+
+    pub fn set_titlet(&self, _title: &str) {
+        unsafe {
+            XStoreName(self.display, self.window, _title.as_ptr() as *const i8);
+        };
+
+    }
+
 }
