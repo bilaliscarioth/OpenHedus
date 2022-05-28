@@ -14,4 +14,5 @@ name = "lse"
 [dependencies]
 x11 = "2.19.1"
 gl = "0.14.0"
+gl_loader = "0.1.2"
 throw = "0.1.7"
