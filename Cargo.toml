@@ -1,18 +1,11 @@
 [package]
-name = "lse"
+name = "libresourceengine"
 version = "0.1.0"
 edition = "2021"
-license = "ISC"
-authors = ["bilaliscarioth"]
-
-
-[lib]
-name = "lse"
+licence = "ISC"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-x11 = "2.19.1"
-gl = "0.14.0"
-gl_loader = "0.1.2"
-throw = "0.1.7"
+sdl2 		= 	"*" 
+throw   =   "0.1.7"
