@@ -1,132 +1,30 @@
-use std::time::{SystemTime};
+use crate::io::files::filemode::Filemode;
 
-pub enum LoggingLevel{
-    NOTSET,
-    DEBUG,
-    INFO,
-    WARNING,
-    ERROR,
-    CRITICAL
-}
-
-pub enum LoggingConfigData {
-    Basic{
-        filepath:   String,
-        filemode:   char,
-        level:      u8,
-        format:     String,
-        datefmt:    String,
-        ext_info:   bool,
-        name:       String
-    },
-
-    Critical{
-        filepath:   String,
-        filemode:   char,
-        level:      u8,
-        format:     String,
-        datefmt:    String,
-        ext_info:   bool,
-        name:       String,
-        throw_error:    String
-    }
-}
-
-impl LoggingConfigData{
-    pub fn new(_level:  LoggingLevel, filemode: char, filepath: String, format: String, 
-        datefmt: String, ext_info: bool) -> Self {
-
-        let mut level : u8 = 0;
-        let mut level_name : String = "".to_string();
-        match _level {
-            LoggingLevel::NOTSET => {
-                level = 0;
-                level_name = "[NOTSET]".to_string();
-            },
-            LoggingLevel::DEBUG => {
-                level = 1;
-                level_name = "[DEBUG]".to_string();
-            },
-            LoggingLevel::INFO => {
-                level = 2;
-                level_name = "[INFO]".to_string();
-            },
-            LoggingLevel::WARNING => {
-                level = 4;
-                level_name = "[WARNING]".to_string();
-            },
-            LoggingLevel::ERROR => {
-                level = 8;
-                level_name = "[ERROR]".to_string();
-            },
-            LoggingLevel::CRITICAL => {
-                level = 16;
-                level_name = "[CRITICAL]".to_string();
-            }
-        }
-
-        LoggingConfigData::Basic{
-                    level:      level,
-                    name:       level_name,
-                    filemode:   filemode,
-                    filepath:   filepath,
-                    format:     format,
-                    datefmt:    datefmt,
-                    ext_info:   ext_info
-        }
-    }
-
-    pub fn change_level(&self, _level :LoggingLevel) -> Option<Self> {
-        match self {
-            Self::Basic{name, filemode, filepath, format, datefmt, ext_info, ..} |
-            Self::Critical{name, filemode, filepath, format, datefmt, ext_info, ..} => {
-                Some(LoggingConfigData::new(
-                    _level,
-                    *filemode,
-                    filepath.to_string(),
-                    format.to_string(),
-                    datefmt.to_string(),
-                    *ext_info
-                ))
-            }
-
-            _ => {None}
-        }
-    }
-
-    pub fn get(&self, _config: Option<LoggingConfigData>) -> Option<Self> {
-        match _config.unwrap() {
-            LoggingConfigData::Basic{filepath, filemode, level, format, datefmt, ext_info, name} => {
-                Some(LoggingConfigData::Basic{
-                    filepath:   filepath,
-                    filemode:   filemode,
-                    level:      level,
-                    format:     format,
-                    datefmt:    datefmt,
-                    ext_info:   ext_info,
-                    name:       name
-                })
-            }
-            _ => {None}
-        }
-    }
-
-    pub fn get_level_info(&self) -> (u8, String) {
-        match self{
-            Self::Basic{level, name, ..} => {(*level, name.to_string())},
-            Self::Critical{level, name, ..} => {(*level, name.to_string())}
-        }
-    }
-}
+use crate::sys::log::config::LoggingConfigData;
+use crate::sys::log::level::LoggingLevel;
+use crate::sys::time::LseTime;
 
 pub struct LseLogging{
     config:     Option<LoggingConfigData>,
 }
 
 impl LseLogging {
-    pub fn new(_config: Option<LoggingConfigData>) -> LseLogging {
+    pub fn new(_level:  u8, _filepath: String, _format: String,
+        _datefmt: String, _ext_info: bool) -> LseLogging {
+
+        let filemode : char = Filemode::Write.into_char();
+        let (level, level_name) : (u8, String) = LoggingLevel::into_tuples(_level);
+
         LseLogging{
-            config:     _config
+            config:   Some(LoggingConfigData::Basic{
+                level:      _level,
+                name:       level_name,
+                filemode:   filemode,
+                filepath:   _filepath,
+                format:     _format,
+                datefmt:    _datefmt,
+                ext_info:   _ext_info
+            })
         }
     }
 
@@ -139,22 +37,54 @@ impl LseLogging {
         result
     }
 
-    pub fn log(&self, _format: &str, _value_str : &Vec<&str> ,_config: Option<LoggingConfigData>) -> String {
-        /*
-         * if coders want to change config
-         */
+    pub fn log(&self, _format: &str, _value_str : &Vec<&str> ,_config: Option<LoggingConfigData>)
+               -> Result<String, throw::Error<String>>{
 
-        match _config {
-            Some(_) => {
+        let mut config : Option<&LoggingConfigData> = self.config.as_ref();
+        let mut final_fmt: String = "".to_string();
+
+        let (mut level_int, mut level_name) : (u8, String)  =  (0, "".to_string());
+
+        match config {
+            Some(level_config) => {
+                match level_config {
+                    LoggingConfigData::Basic {level, name, format, ..} | LoggingConfigData::Critical {format, level, name, ..} => {
+                        final_fmt = format.to_owned();
+                        (level_int, level_name) = (*level, name.to_owned());
+
+                    }
+                }
             },
-            None => {}
+            None => {
+                (level_int, level_name) = (0, "[NOTSET]".to_string());
+            }
         }
-        let time = SystemTime::now().elapsed().unwrap().as_secs();
-        let (level, level_name) = self.config.as_ref().unwrap().get_level_info();
-        let final_fmt : String = LseLogging::change_fmt(_format, _value_str);
 
-        println!("{}, {} {}", time, level_name,final_fmt);
+        let time = LseTime::now();
 
-        final_fmt
+        match time {
+            Ok(a) => {
+                let mut time : String = "".to_string();
+                time += &(a.year.as_str().to_owned() + "/" + a.month.as_str() + "/"+ a.day.as_str() + " ") ;
+                time += &("[".to_string() + a.hour.as_str() + ":" + a.minutes.as_str() + "] -");
+                final_fmt = final_fmt.replace("{time}", time.as_str());
+            },
+
+            Err(_) => {
+                final_fmt = final_fmt.replace("{time}", "Not found -");
+            }
+
+        }
+
+        final_fmt = final_fmt.replace("{level_name}", level_name.as_str());
+        final_fmt  = final_fmt.replace("{message}", LseLogging::change_fmt(_format, _value_str).as_str());
+
+        println!("{}", final_fmt);
+
+        if level_int == 16 {
+            panic!("{} ", final_fmt);
+        }
+
+        Ok(final_fmt)
     }
 }

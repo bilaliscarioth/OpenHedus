@@ -1,4 +1,3 @@
-#[macro_use]
-extern crate throw;
-
 pub mod sys;
+pub mod io;
+extern crate throw;

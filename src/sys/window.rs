@@ -2,16 +2,17 @@ extern crate sdl2;
 
 use sdl2::pixels::Color;
 use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use std::time::Duration;
+use sdl2::render::Canvas;
+use sdl2::video::Window;
+use sdl2::{Sdl, VideoSubsystem};
 
 pub struct LseWindow<'a>{
     title: &'a str,
     width: u16,
     height: u16,
-    sdl_instance:       sdl2::Sdl,
-    video_subsystem:    sdl2::VideoSubsystem,
-    window_instance:    sdl2::video::Window
+    sdl_instance:       Sdl,
+    video_subsystem:    VideoSubsystem,
+    window_instance:    Window
 }
 
 impl<'a> LseWindow<'a> {
@@ -34,8 +35,8 @@ impl<'a> LseWindow<'a> {
         })
     }
 
-    pub fn swap_buffers(&self) {
-
+    pub fn create_canvas(self) -> Canvas<Window> {
+        self.window_instance.into_canvas().build().unwrap()
     }
 
     pub fn get_events(&self)  -> sdl2::EventPump {
