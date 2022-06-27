@@ -41,17 +41,26 @@ impl LseLogging {
                -> Result<String, throw::Error<String>>{
 
         let mut config : Option<&LoggingConfigData> = self.config.as_ref();
+
+        match _config {
+            Some(ref a) => {
+                config = Some(a);
+            },
+
+            None => {}
+
+        }
+
         let mut final_fmt: String = "".to_string();
 
         let (mut level_int, mut level_name) : (u8, String)  =  (0, "".to_string());
 
         match config {
-            Some(level_config) => {
+            Some(ref level_config) => {
                 match level_config {
                     LoggingConfigData::Basic {level, name, format, ..} | LoggingConfigData::Critical {format, level, name, ..} => {
                         final_fmt = format.to_owned();
                         (level_int, level_name) = (*level, name.to_owned());
-
                     }
                 }
             },
@@ -69,11 +78,9 @@ impl LseLogging {
                 time += &("[".to_string() + a.hour.as_str() + ":" + a.minutes.as_str() + "] -");
                 final_fmt = final_fmt.replace("{time}", time.as_str());
             },
-
             Err(_) => {
                 final_fmt = final_fmt.replace("{time}", "Not found -");
             }
-
         }
 
         final_fmt = final_fmt.replace("{level_name}", level_name.as_str());
