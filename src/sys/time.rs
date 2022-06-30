@@ -43,8 +43,8 @@ impl LseTime {
 
                 let res : i64 = s as i64 - ((y-1970)*31557600)  + (m*2682000) + (d*86400) as i64;
 
-                let mi = (res / 60) %60;
-                let h = (res/3600) % 23;
+                let mi = (res / 60 ) % 60;
+                let h = (res / 3600) %24;
 
                 Ok(LseTime{
                     year: y.to_string(),

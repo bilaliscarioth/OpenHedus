@@ -9,11 +9,11 @@ pub struct LseLogging{
 }
 
 impl LseLogging {
-    pub fn new(_level:  u8, _filepath: String, _format: String,
+    pub fn new(level:  u8, _filepath: String, _format: String,
         _datefmt: String, _ext_info: bool) -> LseLogging {
 
         let filemode : char = Filemode::Write.into_char();
-        let (level, level_name) : (u8, String) = LoggingLevel::into_tuples(_level);
+        let (_level, level_name) : (u8, String) = LoggingLevel::into_tuples(level);
 
         LseLogging{
             config:   Some(LoggingConfigData::Basic{
@@ -37,8 +37,7 @@ impl LseLogging {
         result
     }
 
-    pub fn log(&self, _format: &str, _value_str : &Vec<&str> ,_config: Option<LoggingConfigData>)
-               -> Result<String, throw::Error<String>>{
+    pub fn log(&self, _format: &str, _value_str : &Vec<&str> ,_config: Option<LoggingConfigData>) {
 
         let mut config : Option<&LoggingConfigData> = self.config.as_ref();
 
@@ -46,14 +45,12 @@ impl LseLogging {
             Some(ref a) => {
                 config = Some(a);
             },
-
             None => {}
-
         }
 
         let mut final_fmt: String = "".to_string();
 
-        let (mut level_int, mut level_name) : (u8, String)  =  (0, "".to_string());
+        let (level_int, level_name) : (u8, String);
 
         match config {
             Some(ref level_config) => {
@@ -83,6 +80,7 @@ impl LseLogging {
             }
         }
 
+        final_fmt = final_fmt.replace("{level}", level_int.to_string().as_str());
         final_fmt = final_fmt.replace("{level_name}", level_name.as_str());
         final_fmt  = final_fmt.replace("{message}", LseLogging::change_fmt(_format, _value_str).as_str());
 
@@ -91,7 +89,5 @@ impl LseLogging {
         if level_int == 16 {
             panic!("{} ", final_fmt);
         }
-
-        Ok(final_fmt)
     }
 }

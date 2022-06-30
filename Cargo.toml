@@ -1,5 +1,5 @@
 [package]
-name = "libresourceengine"
+name = "hedus"
 version = "0.1.0"
 edition = "2021"
 licence = "ISC"
@@ -7,6 +7,8 @@ licence = "ISC"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sdl2 		= 	"0.35.2"
+sdl2 	=   "0.35.2"
 throw   =   "0.1.7"
-time 		= 	{version = "0.3.9", features= ["local-offset"]}
+wgpu 	=   "0.12.0"
+gl      =   "0.14.0"
+gl_loader      =   "0.1.2"

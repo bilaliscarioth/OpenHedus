@@ -1,7 +1,8 @@
 extern crate sdl2;
+extern crate gl;
+extern crate gl_loader;
 
 use sdl2::event::Event;
-use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::{Sdl, VideoSubsystem};
 
@@ -14,6 +15,11 @@ impl<'a> LseWindow {
     pub fn new() -> Result<LseWindow, Box <dyn std::error::Error>>{
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
+
+        // Load OpenGL library.
+        gl_loader::init_gl();
+        // Load all the OpenGL function pointer using the `gl` crate.
+        gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
 
         Ok(LseWindow{
             sdl_instance: sdl_context,

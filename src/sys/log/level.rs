@@ -18,6 +18,16 @@ impl LoggingLevel {
             LoggingLevel::NOTSET => { (0, "[NOTSET]".to_string()) }
         }
     }
+    pub fn get_names(_level: u8) -> String  {
+        match _level {
+            1 => { "[DEBUG]".to_string()  },
+            2 => { "[INFO]".to_string() },
+            4 => { " [WARNING]".to_string() },
+            8 => { "[ERROR]".to_string() },
+            16 => { "[CRITICAL]".to_string() },
+            _ => { "[NOTSET]".to_string() }
+        }
+    }
     pub fn into_tuples(_level: u8) -> (u8, String)  {
         match _level {
             1 => { (1, "[DEBUG]".to_string())  },

@@ -62,8 +62,7 @@ impl LoggingConfigData{
                     datefmt.to_string(),
                     *ext_info
                 ))
-            },
-            _ => {None}
+            }
         }
     }
 }

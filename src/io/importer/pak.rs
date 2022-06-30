@@ -3,7 +3,7 @@ use std::io::{SeekFrom, Seek};
 use std::io::{Error, ErrorKind, Read};
 
 // /!\ .PAK from Quake2 is stocked on 32bit var !
-
+// Size of 64 bytes !
 pub struct PakEntry {
     pub filename:   String,
     pub offset:     u32,
@@ -19,12 +19,12 @@ struct PakHeader {
 pub struct PAK {
     header :        PakHeader,
     files :         Vec<PakEntry>,
-    file :          File
+    pub file :          File
 }
 
 impl PAK {
     pub fn open(filepath: String) -> Result<PAK, Error> {
-        const magic_header :  u32 = (75 << 24)+(67 << 16)+(65 <<8)+80;
+        const MAGIC_HEADER :  u32 = (75 << 24)+(67 << 16)+(65 <<8)+80;
 
         let mut file : File = File::open(filepath).unwrap();
         let file_len : u64 = file.metadata().unwrap().len();
@@ -46,15 +46,14 @@ impl PAK {
         header.dir_offset = u32::from_le_bytes(dir_offset);
         header.dir_size = u32::from_le_bytes(dir_size) >> 6;
 
-
-        if header.ident as u32 != magic_header {
+        if header.ident as u32 != MAGIC_HEADER {
             return Err(Error::new(ErrorKind::Other, "PAK is busy !"))
         }
 
         file.seek(SeekFrom::Start(header.dir_offset as u64)).unwrap();
         file.read(&mut data).expect("");
 
-        let files : Vec<PakEntry> = PAK::read_pak_entries(&data[0..(header.dir_size as usize * std::mem::size_of::<PakEntry>()) as usize]);
+        let files : Vec<PakEntry> = PAK::read_pak_entries(&data[0..(header.dir_size as usize * 64) as usize]);
 
         Ok(PAK {
             header: header,
@@ -82,27 +81,26 @@ impl PAK {
             let size = u32::from_le_bytes(size_bytes);
             let offset = u32::from_le_bytes(offset_bytes);
 
-            println!("{}", filename);
-
             pak_files.push(PakEntry{
                 filename: filename,
                 size: size,
                 offset: offset
             });
 
+
             data = &data[64..data.len()];
         }
 
         pak_files
-
     }
 
-    pub fn get_files(&self, filepath: String) -> Option<&PakEntry> {
+    pub fn get_file(&self, filepath: String) -> Option<&PakEntry> {
         for i in 0..self.files.len() as usize {
-            if self.files[i].filename == filepath {
+            if filepath.eq(&self.files[i].filename[..filepath.len() as usize]) {
                 return Some(&self.files[i]);
             }
         }
+        println!("Rien");
         None
     }
 }
