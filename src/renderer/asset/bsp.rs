@@ -14,4 +14,3 @@ trait BSPFunction {
 
     fn copy_lump<T>(Self, lump_flags: u32, dest: &Vec<T>) -> u32;
 }
-

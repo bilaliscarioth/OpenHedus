@@ -1,4 +1,6 @@
 use crate::common::mathlib::vector3::Vector3f;
+use crate::io::importer::pak::PakEntry;
+use crate::renderer::asset::bsp::Bsp_Data
 
 enum LumpIndex
 {
@@ -203,4 +205,15 @@ struct Area {
 
 pub struct BSP{
 
+}
+
+impl BSP {
+
+    pub fn from_pak(&self, file: PakEntry) {
+
+    }
+
+    pub fn open(&self, filepath: String) {
+
+    }
 }

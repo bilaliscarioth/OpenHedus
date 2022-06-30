@@ -75,7 +75,22 @@ struct Texdata {
     view_height:    i32
 }
 
-pub struct BSP{
+pub struct BSP {
+    header: Header,
+    vertexes:   [Vector3f; 65536],
+    edges:  [Edge; 256000],
+    planes: [Plane; 65536],
+    faces:  [Faces; 65536],
+    nodes:  [Nodes; 65536],
+    leafs:  [Leaf; 65536],
+}
 
+impl BSP {
+    pub fn from_pak(&self, file: PakEntry, pak: PAK) {
 
+    }
+
+    pub fn open(&self, filepath: String) {
+
+    }
 }
